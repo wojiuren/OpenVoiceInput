@@ -144,12 +144,6 @@ Build a local portable test package:
 .\scripts\build-test-package.ps1 -Version v0.1.0-test.5
 ```
 
-## Current Public-Release Status
+## Release Status
 
-This repository is not ready to be made public as-is. The current cleanup focus is:
-
-- separate public docs from local construction notes;
-- remove stale README language and internal worklog references;
-- rebuild and verify the next test package;
-- decide whether to publish from a clean-history public repository;
-- add GitHub topics, issue labels, and release assets.
+This is an early public test snapshot. Expect rough edges, especially around GUI polish, hotkey compatibility, packaging, and model setup. Please use GitHub issues for reproducible bugs and feature requests.
