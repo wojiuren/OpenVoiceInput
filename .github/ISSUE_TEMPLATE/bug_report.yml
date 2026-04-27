@@ -1,0 +1,80 @@
+name: Bug report
+description: Report something that is broken or confusing.
+title: "[Bug]: "
+labels:
+  - type: bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing OpenVoiceInput-MVP. Please do not paste API keys, private recordings, or personal file paths.
+  - type: input
+    id: version
+    attributes:
+      label: Version or build
+      description: Example: v0.1.0-test.5 portable package, or source checkout commit.
+      placeholder: v0.1.0-test.5
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - GUI
+        - ASR / transcription
+        - Hotkey / hold-to-talk
+        - Clipboard / paste output
+        - Quick notes
+        - API text cleanup
+        - Packaging / install
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the problem in plain language.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest steps that trigger the problem.
+      placeholder: |
+        1. Open Start-OpenVoiceInput.cmd
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows version, Python version, input device, model, and whether you used the portable package.
+      placeholder: |
+        Windows:
+        Python:
+        Package or source:
+        Input device:
+        Model:
+    validations:
+      required: false
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Environment check output
+      description: Paste output from `py -m local_voice_input doctor --run-transcribe-smoke` if relevant. Remove personal paths if needed.
+      render: text
+    validations:
+      required: false
+

@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest a new capability or improvement.
+title: "[Feature]: "
+labels:
+  - type: enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the workflow you want to improve. Concrete examples are more useful than broad feature names.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - GUI
+        - ASR / transcription
+        - Hotkey / hold-to-talk
+        - Clipboard / paste output
+        - Quick notes
+        - API text cleanup
+        - Model selection / benchmarking
+        - Packaging / install
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and what gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should OpenVoiceInput-MVP do instead?
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+

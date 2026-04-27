@@ -1,0 +1,6 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Privacy and troubleshooting notes
+    url: https://github.com/wojiuren/OpenVoiceInput-MVP/blob/main/docs/troubleshooting.md
+    about: Read this before sharing logs or diagnostic output.
+

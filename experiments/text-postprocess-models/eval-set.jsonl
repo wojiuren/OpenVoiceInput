@@ -1,0 +1,10 @@
+{"id":"polish_001_short_dictation","task":"polish","input":"呃我今天想测试一下这个 open voice input 的本地模型功能看看它能不能自动提取热词和改格式","expected_notes":"去掉口头词，保留 OpenVoiceInput 或 open voice input，不增加新事实。"}
+{"id":"polish_002_punctuation","task":"polish","input":"明天上午十点提醒我看一下 qwen 三 asr 的模型测速结果然后把那个热词提取的配置也顺手检查一下","expected_notes":"补标点；Qwen3-ASR、模型测速、热词提取应尽量规整。"}
+{"id":"polish_003_homophone","task":"polish","input":"这个项目计划先不要往下写代码我们先测一下润色模型和候选热词模型到底哪个比较稳","expected_notes":"项目计划、润色模型、候选热词模型应保留；不要改成别的产品方向。"}
+{"id":"polish_004_note_style","task":"polish","input":"快速记录灵感我觉得以后可以根据开头关键词把内容扔到不同文件夹比如小说设定代码想法还有每天复盘","expected_notes":"保留快速记录、关键词、不同文件夹、小说设定、代码想法、每天复盘。"}
+{"id":"polish_005_mixed_english","task":"polish","input":"这个 api processing 如果失败的话就 fallback raw text 不要卡住整个 hold to talk 链路","expected_notes":"保留 API processing、fallback raw text、hold-to-talk；中文表达自然。"}
+{"id":"polish_006_long_sentence","task":"polish","input":"我刚才试了一下那个第三方语音输入法突然又能用了但是后来发现好像是他们服务暂停不是我麦克风的问题所以我们自己的本地离线方案还是要继续做","expected_notes":"补标点，逻辑清楚；不要删掉“服务暂停”和“本地离线方案”。"}
+{"id":"hotwords_001_project_terms","task":"hotwords","input":"今天主要在测 OpenVoiceInput 的 hold to talk 链路，顺便看了一下 SenseVoice、Qwen3-ASR 和快速记录规则。","expected_notes":"候选热词应包含 OpenVoiceInput、hold-to-talk、SenseVoice、Qwen3-ASR、快速记录。"}
+{"id":"hotwords_002_people_places","task":"hotwords","input":"小说设定里林秋白在云河县开了一家旧书店，许知夏负责整理灵感笔记和人物关系。","expected_notes":"候选热词应包含林秋白、云河县、旧书店、许知夏、灵感笔记、人物关系。"}
+{"id":"hotwords_003_tech_stack","task":"hotwords","input":"后面如果接 4090 服务端，远程 ASR adapter 应该通过 RemoteAsrBackend 走统一后端边界，不要让 GUI 直接知道 HTTP 细节。","expected_notes":"候选热词应包含 4090、远程 ASR、adapter、RemoteAsrBackend、统一后端边界、GUI、HTTP。"}
+{"id":"hotwords_004_daily_review","task":"hotwords","input":"晚上复盘的时候我想自动总结今天做了哪些测试、哪些模型速度太慢、哪些术语需要加入热词表。","expected_notes":"候选热词应包含复盘、自动总结、模型速度、术语、热词表。"}

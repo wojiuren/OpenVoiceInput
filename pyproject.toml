@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-voice-input-mvp"
+version = "0.1.0"
+description = "Hardware-aware local voice input prototype."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+asr = [
+    "sherpa-onnx>=1.12.39",
+    "soundfile>=0.13.1",
+]
+audio = [
+    "sounddevice>=0.5.5",
+    "soundfile>=0.13.1",
+]
+hotkey = [
+    "keyboard>=0.13.5",
+]
+output = [
+    "pyperclip>=1.11.0",
+]
+all = [
+    "keyboard>=0.13.5",
+    "pyperclip>=1.11.0",
+    "sherpa-onnx>=1.12.39",
+    "sounddevice>=0.5.5",
+    "soundfile>=0.13.1",
+]
+
+[project.scripts]
+open-voice-input = "local_voice_input.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

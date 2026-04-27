@@ -1,0 +1,24 @@
+[
+  {
+    "id": "qwen3-1.7b-q4_k_m",
+    "display_name": "Qwen3 1.7B Q4_K_M",
+    "role_candidates": ["polish", "hotwords"],
+    "path": "models/Qwen3-1.7B.Q4_K_M.gguf",
+    "repo": "QuantFactory/Qwen3-1.7B-GGUF",
+    "source_url": "https://huggingface.co/QuantFactory/Qwen3-1.7B-GGUF",
+    "download_url": "https://huggingface.co/QuantFactory/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B.Q4_K_M.gguf?download=true",
+    "min_bytes": 1200000000,
+    "notes": "First small local candidate for 7840HS instant polishing."
+  },
+  {
+    "id": "qwen3-4b-q4_k_m",
+    "display_name": "Qwen3 4B Q4_K_M",
+    "role_candidates": ["polish", "hotwords"],
+    "path": "models/Qwen3-4B-Q4_K_M.gguf",
+    "repo": "Qwen/Qwen3-4B-GGUF",
+    "source_url": "https://huggingface.co/Qwen/Qwen3-4B-GGUF",
+    "download_url": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf?download=true",
+    "min_bytes": 2400000000,
+    "notes": "Official Qwen GGUF candidate; likely better quality but heavier."
+  }
+]

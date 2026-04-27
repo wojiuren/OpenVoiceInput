@@ -1,0 +1,43 @@
+# Suggested labels for the public repository.
+# This file documents the label set and can be applied manually or with a label-sync tool.
+
+- name: area: gui
+  color: "1f77b4"
+  description: GUI, tray, startup, and window behavior.
+- name: area: asr
+  color: "2ca02c"
+  description: Speech recognition, models, devices, and transcription.
+- name: area: packaging
+  color: "9467bd"
+  description: Portable package, install, release, and startup scripts.
+- name: area: docs
+  color: "8c564b"
+  description: README, docs, examples, and public release notes.
+- name: area: model-eval
+  color: "17becf"
+  description: Model benchmarks, evaluation sets, and candidate models.
+- name: area: privacy
+  color: "d62728"
+  description: Recordings, clipboard, API keys, local logs, and data boundaries.
+- name: type: bug
+  color: "d73a4a"
+  description: Something is broken or behaves incorrectly.
+- name: type: enhancement
+  color: "a2eeef"
+  description: A user-facing improvement or new capability.
+- name: type: research
+  color: "c5def5"
+  description: Investigation, comparison, benchmark, or feasibility work.
+- name: priority: high
+  color: "b60205"
+  description: Important for the next usable test build.
+- name: priority: medium
+  color: "fbca04"
+  description: Useful but not blocking the next test build.
+- name: priority: low
+  color: "0e8a16"
+  description: Nice to have.
+- name: good first issue
+  color: "7057ff"
+  description: Small, well-scoped task suitable for new contributors.
+
