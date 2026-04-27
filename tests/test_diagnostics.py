@@ -3,7 +3,13 @@ from unittest.mock import patch
 
 import test_bootstrap  # noqa: F401
 
-from local_voice_input.diagnostics import DiagnosticCheck, format_diagnostics, has_failures, run_diagnostics
+from local_voice_input.diagnostics import (
+    DiagnosticCheck,
+    _sensevoice_model_check,
+    format_diagnostics,
+    has_failures,
+    run_diagnostics,
+)
 
 
 class DiagnosticsTests(unittest.TestCase):
@@ -32,3 +38,14 @@ class DiagnosticsTests(unittest.TestCase):
 
         smoke.assert_not_called()
         self.assertTrue(checks)
+
+    def test_missing_sensevoice_model_check_suggests_download_command(self):
+        class FakeBackend:
+            def unavailable_reason(self):
+                return "missing model files: model.int8.onnx, tokens.txt"
+
+        with patch("local_voice_input.diagnostics.SherpaOnnxSenseVoiceBackend", return_value=FakeBackend()):
+            check = _sensevoice_model_check()
+
+        self.assertFalse(check.ok)
+        self.assertIn("download-model sensevoice-small-onnx-int8", check.message)

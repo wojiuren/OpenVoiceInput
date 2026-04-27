@@ -20,6 +20,11 @@ class AudioConfig:
 
 
 @dataclass(frozen=True)
+class RecordingConfig:
+    keep_audio_files: bool = False
+
+
+@dataclass(frozen=True)
 class HotkeyConfig:
     hold_to_talk: str = "caps_lock"
     cancel: str = "esc"
@@ -122,6 +127,7 @@ class TaskRoutingConfig:
 class AppConfig:
     selection: SelectionRequest = field(default_factory=SelectionRequest)
     audio: AudioConfig = field(default_factory=AudioConfig)
+    recording: RecordingConfig = field(default_factory=RecordingConfig)
     hotkey: HotkeyConfig = field(default_factory=HotkeyConfig)
     quick_capture: QuickCaptureConfig = field(default_factory=QuickCaptureConfig)
     hotwords: HotwordConfig = field(default_factory=HotwordConfig)
@@ -142,6 +148,7 @@ class AppConfig:
         return cls(
             selection=_coerce_dataclass(SelectionRequest, data.get("selection", {})),
             audio=_coerce_dataclass(AudioConfig, audio_data),
+            recording=_coerce_recording(data.get("recording", {})),
             hotkey=_coerce_dataclass(HotkeyConfig, data.get("hotkey", {})),
             quick_capture=_coerce_quick_capture(data.get("quick_capture", {})),
             hotwords=_coerce_hotwords(data.get("hotwords", {})),
@@ -185,6 +192,11 @@ def _coerce_quick_capture_rule(raw: dict[str, Any]) -> QuickCaptureRule:
         match_window_chars=raw.get("match_window_chars"),
         remove_keyword=raw.get("remove_keyword"),
     )
+
+
+def _coerce_recording(raw: object) -> RecordingConfig:
+    config = _coerce_dataclass(RecordingConfig, raw)
+    return replace(config, keep_audio_files=_coerce_bool(config.keep_audio_files, default=False))
 
 
 def _coerce_hotwords(raw: object) -> HotwordConfig:
@@ -336,6 +348,7 @@ def update_config(
     input_device: int | str | None = None,
     sample_rate_hz: int | None = None,
     channels: int | None = None,
+    keep_audio_files: bool | None = None,
     hold_to_talk: str | None = None,
     submit_strategy: str | None = None,
     api_process_enabled: bool | None = None,
@@ -368,6 +381,10 @@ def update_config(
         audio = replace(audio, sample_rate_hz=sample_rate_hz)
     if channels is not None:
         audio = replace(audio, channels=channels)
+
+    recording = config.recording
+    if keep_audio_files is not None:
+        recording = replace(recording, keep_audio_files=keep_audio_files)
 
     hotkey = config.hotkey
     if hold_to_talk is not None:
@@ -406,6 +423,7 @@ def update_config(
         config,
         selection=selection,
         audio=audio,
+        recording=recording,
         hotkey=hotkey,
         quick_capture=quick_capture,
         api_processing=api_processing,
@@ -471,6 +489,52 @@ def update_api_provider(
     if timeout_s is not None:
         api_provider = replace(api_provider, timeout_s=timeout_s)
     return replace(config, api_provider=api_provider)
+
+
+def update_remote_asr(
+    config: AppConfig,
+    *,
+    enabled: bool | None = None,
+    profile: str | None = None,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
+    timeout_s: float | None = None,
+    connect_timeout_s: float | None = None,
+    upload_mode: str | None = None,
+    fallback_model_id: str | None = None,
+    max_audio_mb: int | None = None,
+    verify_tls: bool | None = None,
+) -> AppConfig:
+    remote_asr = config.remote_asr
+    active_profile = (profile or remote_asr.profile or "home_4090").strip() or "home_4090"
+    profiles = dict(remote_asr.profiles)
+    profile_config = profiles.get(active_profile, RemoteAsrProfileConfig())
+
+    if base_url is not None:
+        profile_config = replace(profile_config, base_url=base_url)
+    if api_key_env is not None:
+        profile_config = replace(profile_config, api_key_env=api_key_env)
+    if timeout_s is not None:
+        profile_config = replace(profile_config, timeout_s=timeout_s)
+    if connect_timeout_s is not None:
+        profile_config = replace(profile_config, connect_timeout_s=connect_timeout_s)
+    if upload_mode is not None:
+        profile_config = replace(profile_config, upload_mode=upload_mode)
+    if fallback_model_id is not None:
+        profile_config = replace(profile_config, fallback_model_id=fallback_model_id)
+    if max_audio_mb is not None:
+        profile_config = replace(profile_config, max_audio_mb=max_audio_mb)
+    if verify_tls is not None:
+        profile_config = replace(profile_config, verify_tls=verify_tls)
+
+    profiles[active_profile] = _coerce_remote_asr_profile(asdict(profile_config))
+    remote_asr = replace(
+        remote_asr,
+        enabled=remote_asr.enabled if enabled is None else enabled,
+        profile=active_profile,
+        profiles=profiles,
+    )
+    return replace(config, remote_asr=_coerce_remote_asr(asdict(remote_asr)))
 
 
 def update_task_route(

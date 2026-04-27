@@ -127,6 +127,9 @@ set "PYTHONPATH=%~dp0src"
 title OpenVoiceInput - Doctor
 py -m local_voice_input doctor --run-transcribe-smoke
 echo.
+echo [OpenVoiceInput] If model files are missing, run:
+echo py -m local_voice_input download-model sensevoice-small-onnx-int8
+echo.
 pause
 endlocal
 '@
@@ -175,7 +178,10 @@ $readmeLines = @(
     "- API key",
     "",
     "If doctor reports missing Python packages, run Install-Dependencies.cmd.",
-    "If doctor reports missing model files, check models\$modelName for model.int8.onnx and tokens.txt."
+    "If doctor reports missing model files, run:",
+    "py -m local_voice_input download-model sensevoice-small-onnx-int8",
+    "",
+    "Or check models\$modelName for model.int8.onnx and tokens.txt."
 )
 $readme = $readmeLines -join [Environment]::NewLine
 

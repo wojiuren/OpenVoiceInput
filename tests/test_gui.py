@@ -352,6 +352,7 @@ class GuiTests(unittest.TestCase):
             api_preset="正式改写 formal",
             api_fallback_raw=True,
             quick_note_enabled=True,
+            keep_audio_files=True,
         )
 
         self.assertEqual(updated.selection.language, "en")
@@ -362,6 +363,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(updated.api_processing.preset, "formal")
         self.assertTrue(updated.api_processing.fallback_raw)
         self.assertTrue(updated.quick_capture.enabled)
+        self.assertTrue(updated.recording.keep_audio_files)
 
     def test_apply_gui_settings_ignores_no_device_placeholder(self):
         config = AppConfig(
@@ -855,6 +857,22 @@ class GuiTests(unittest.TestCase):
 
         self.assertIn("--quick-note", command)
         self.assertEqual(command[-1], "--quick-note")
+
+    def test_hold_to_talk_command_includes_keep_audio_when_enabled_in_gui_config(self):
+        config = apply_gui_settings(
+            AppConfig(),
+            language="zh",
+            input_device_text="",
+            hold_to_talk="caps_lock",
+            submit_strategy="clipboard_paste",
+            keep_audio_files=True,
+        )
+
+        with mock.patch("local_voice_input.gui._console_python_executable", return_value="C:\\Python312\\python.exe"):
+            command = _hold_to_talk_command(Path("config.json"), config)
+
+        self.assertIn("--keep-audio", command)
+        self.assertEqual(command[-1], "--keep-audio")
 
     def test_hold_to_talk_log_path_uses_captures_directory(self):
         self.assertEqual(_hold_to_talk_log_path(Path("captures")), Path("captures") / "hold-to-talk.log")

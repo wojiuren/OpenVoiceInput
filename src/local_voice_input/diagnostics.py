@@ -7,6 +7,7 @@ import importlib.util
 from pathlib import Path
 
 from .audio_capture import AudioCaptureError, list_input_devices
+from .model_download import sensevoice_setup_hint
 from .sherpa_backend import SENSEVOICE_DIR_NAME, SherpaOnnxSenseVoiceBackend, default_model_root
 
 
@@ -54,7 +55,7 @@ def _sensevoice_model_check() -> DiagnosticCheck:
     backend = SherpaOnnxSenseVoiceBackend()
     reason = backend.unavailable_reason()
     if reason:
-        return DiagnosticCheck(name="model:sensevoice", ok=False, message=reason)
+        return DiagnosticCheck(name="model:sensevoice", ok=False, message=f"{reason}; {sensevoice_setup_hint()}")
     return DiagnosticCheck(name="model:sensevoice", ok=True, message=str(backend.model_files.model))
 
 

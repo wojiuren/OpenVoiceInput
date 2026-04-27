@@ -19,6 +19,14 @@ py -m local_voice_input doctor --run-transcribe-smoke
 
 全部是 `OK`，说明基础环境是通的。
 
+如果 `model:sensevoice` 显示 `FAIL` 并提示缺少 `model.int8.onnx` 或 `tokens.txt`，先运行：
+
+```powershell
+py -m local_voice_input download-model sensevoice-small-onnx-int8
+```
+
+这条命令会把默认 SenseVoice 小模型下载到项目的 `models/` 目录。它不会录音，只是在准备识别模型。
+
 ## 1.1. 先做小样本测速
 
 体检只能告诉你“能不能跑”，不能告诉你“跑得快不快”。为了避免一上来就拿大模型转一整节课，建议先跑：

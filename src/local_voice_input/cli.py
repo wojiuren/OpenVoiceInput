@@ -43,11 +43,13 @@ from .config import (
     set_hotwords_enabled,
     update_api_provider,
     update_config,
+    update_remote_asr,
     update_task_route,
 )
 from .diagnostics import format_diagnostics, has_failures, run_diagnostics
 from .gui import build_gui_state, launch_gui
 from .hotkey import HotkeyError, HotkeyNames, PushToTalkHotkeyRunner, normalize_hotkey_name
+from .model_download import download_sensevoice_model, sensevoice_install_plan
 from .model_selector import SelectionRequest, detect_hardware, get_model_profiles
 from .quick_note import QuickNoteResult, save_quick_note
 from .text_output import TextOutputError, apply_text_outputs
@@ -87,6 +89,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     doctor_parser = subparsers.add_parser("doctor", help="Check dependencies, model files, and audio devices.")
     doctor_parser.add_argument("--run-transcribe-smoke", action="store_true")
     doctor_parser.add_argument("--json", action="store_true")
+    download_model_parser = subparsers.add_parser("download-model", help="Download a supported local model.")
+    download_model_parser.add_argument("model_id", choices=["sensevoice-small-onnx-int8"])
+    download_model_parser.add_argument("--model-root", default=None)
+    download_model_parser.add_argument("--url", default=None, help="Override the model archive URL.")
+    download_model_parser.add_argument("--force", action="store_true")
+    download_model_parser.add_argument("--keep-archive", action="store_true")
+    download_model_parser.add_argument("--dry-run", action="store_true")
+    download_model_parser.add_argument("--json", action="store_true")
     gui_parser = subparsers.add_parser("gui", help="Open the minimal Tkinter launcher and settings panel.")
     gui_parser.add_argument("--json", action="store_true", help="Print the GUI state instead of opening a window.")
 
@@ -114,6 +124,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     config_set_parser.add_argument("--input-device", default=None)
     config_set_parser.add_argument("--sample-rate", type=int, default=None)
     config_set_parser.add_argument("--channels", type=int, default=None)
+    config_set_parser.add_argument("--keep-audio-files", choices=["true", "false"])
     config_set_parser.add_argument("--hold-to-talk")
     config_set_parser.add_argument("--submit-strategy", choices=["clipboard_paste", "clipboard_only", "type_text"])
 
@@ -175,6 +186,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     api_test_parser.add_argument("--max-tokens", type=int, default=512)
     api_test_parser.add_argument("--json", action="store_true")
 
+    remote_asr_parser = subparsers.add_parser("remote-asr", help="Manage remote ASR config without sending requests.")
+    remote_asr_subparsers = remote_asr_parser.add_subparsers(dest="remote_asr_command", required=True)
+    remote_asr_subparsers.add_parser("show", help="Print remote ASR config.")
+    remote_asr_set_parser = remote_asr_subparsers.add_parser("set", help="Update remote ASR config.")
+    remote_asr_set_parser.add_argument("--enabled", choices=["true", "false"])
+    remote_asr_set_parser.add_argument("--profile")
+    remote_asr_set_parser.add_argument("--base-url")
+    remote_asr_set_parser.add_argument("--api-key-env")
+    remote_asr_set_parser.add_argument("--timeout", type=float)
+    remote_asr_set_parser.add_argument("--connect-timeout", type=float)
+    remote_asr_set_parser.add_argument("--upload-mode", choices=["multipart"])
+    remote_asr_set_parser.add_argument("--fallback-model-id")
+    remote_asr_set_parser.add_argument("--max-audio-mb", type=int)
+    remote_asr_set_parser.add_argument("--verify-tls", choices=["true", "false"])
+
     sendto_parser = subparsers.add_parser("sendto", help="Create Windows Send To / drag-and-drop launchers.")
     sendto_subparsers = sendto_parser.add_subparsers(dest="sendto_command", required=True)
     sendto_subparsers.add_parser("path", help="Print the default Windows SendTo folder.")
@@ -235,6 +261,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     listen_parser.add_argument("--text-out", help="Write recognized text to a UTF-8 text file.")
     listen_parser.add_argument("--srt-out", help="Write a basic UTF-8 SRT subtitle file.")
     listen_parser.add_argument("--quick-note", action="store_true", help="Save recognized text using keyword routing.")
+    _add_recording_retention_arguments(listen_parser)
     _add_api_processing_arguments(listen_parser)
     listen_parser.add_argument("--no-log", action="store_true", help="Do not append to the JSONL transcription log.")
 
@@ -249,6 +276,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     loop_parser.add_argument("--clipboard-only", action="store_true", help="Copy text without auto-pasting.")
     loop_parser.add_argument("--no-paste", action="store_true", help="Print/save only; do not paste.")
     loop_parser.add_argument("--quick-note", action="store_true", help="Save each recognized text using keyword routing.")
+    _add_recording_retention_arguments(loop_parser)
     _add_api_processing_arguments(loop_parser)
     loop_parser.add_argument("--no-log", action="store_true", help="Do not append to the JSONL transcription log.")
     loop_parser.add_argument("--max-turns", type=int, default=None, help=argparse.SUPPRESS)
@@ -265,6 +293,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     hold_parser.add_argument("--clipboard-only", action="store_true", help="Copy text without auto-pasting.")
     hold_parser.add_argument("--no-paste", action="store_true", help="Print/save only; do not paste.")
     hold_parser.add_argument("--quick-note", action="store_true", help="Save each recognized text using keyword routing.")
+    _add_recording_retention_arguments(hold_parser)
     _add_api_processing_arguments(hold_parser)
     hold_parser.add_argument("--no-log", action="store_true", help="Do not append to the JSONL transcription log.")
 
@@ -296,6 +325,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             print(format_diagnostics(checks))
         return 1 if has_failures(checks) else 0
+
+    if args.command == "download-model":
+        return _run_download_model_command(args)
 
     config = load_config(args.config)
     app = VoiceInputApp(config=config)
@@ -338,6 +370,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 input_device=_coerce_device(args.input_device) if args.input_device is not None else None,
                 sample_rate_hz=args.sample_rate,
                 channels=args.channels,
+                keep_audio_files=_coerce_bool(args.keep_audio_files),
                 hold_to_talk=args.hold_to_talk,
                 submit_strategy=args.submit_strategy,
             )
@@ -493,6 +526,32 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(api_result.text)
             return 0
 
+    if args.command == "remote-asr":
+        path = Path(args.config) if args.config else default_config_path()
+        if args.remote_asr_command == "show":
+            print(json.dumps(asdict(config.remote_asr), ensure_ascii=False, indent=2))
+            return 0
+        if args.remote_asr_command == "set":
+            if args.fallback_model_id and not _is_known_model_id(args.fallback_model_id):
+                print(f"error: unknown fallback model: {args.fallback_model_id}", file=sys.stderr)
+                return 2
+            updated = update_remote_asr(
+                config,
+                enabled=_coerce_bool(args.enabled),
+                profile=args.profile,
+                base_url=args.base_url,
+                api_key_env=args.api_key_env,
+                timeout_s=args.timeout,
+                connect_timeout_s=args.connect_timeout,
+                upload_mode=args.upload_mode,
+                fallback_model_id=args.fallback_model_id,
+                max_audio_mb=args.max_audio_mb,
+                verify_tls=_coerce_bool(args.verify_tls),
+            )
+            written = save_config(updated, path)
+            print(str(written))
+            return 0
+
     if args.command == "sendto":
         try:
             if args.sendto_command == "path":
@@ -557,6 +616,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "listen-once":
         request = selection_for_task(config, "dictation", language=args.language)
+        keep_audio = _should_keep_audio(args, config)
+        audio_path = Path(args.output)
         try:
             started = perf_counter()
             result = app.listen_once(
@@ -590,14 +651,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
                 )
         except TextOutputError as exc:
+            _cleanup_audio_file(audio_path, keep_audio=keep_audio)
             print(f"error: {exc}", file=sys.stderr)
             return 2
         except ApiProviderError as exc:
+            _cleanup_audio_file(audio_path, keep_audio=keep_audio)
             print(f"error: {exc}", file=sys.stderr)
             return 2
         except (AudioCaptureError, BackendUnavailableError, TranscriptionError, ValueError) as exc:
+            _cleanup_audio_file(audio_path, keep_audio=keep_audio)
             print(f"error: {exc}", file=sys.stderr)
             return 2
+        _cleanup_audio_file(_source_path_from_result(output_result) or audio_path, keep_audio=keep_audio)
         if args.json:
             print(_result_to_json(output_result, text_output, quick_note_result, api_processing))
         else:
@@ -645,6 +710,41 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"reason: {result.reason}")
         for warning in result.warnings:
             print(f"warning: {warning}")
+    return 0
+
+
+def _run_download_model_command(args) -> int:
+    url = args.url or sensevoice_install_plan().url
+    if args.dry_run:
+        plan = sensevoice_install_plan(model_root=args.model_root, url=url)
+        data = plan.to_dict()
+        data["status"] = "dry_run"
+        if args.json:
+            print(json.dumps(data, ensure_ascii=False, indent=2))
+        else:
+            print(f"model_id: {data['model_id']}")
+            print(f"url: {data['url']}")
+            print(f"target_dir: {data['target_dir']}")
+            print("status: dry_run")
+        return 0
+
+    try:
+        result = download_sensevoice_model(
+            model_root=args.model_root,
+            url=url,
+            force=args.force,
+            keep_archive=args.keep_archive,
+        )
+    except Exception as exc:
+        print(f"error: failed to download model: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(f"status: {result.status}")
+        print(f"target_dir: {result.plan.target_dir}")
+        print(result.message)
     return 0
 
 
@@ -782,6 +882,13 @@ def _print_hold_to_talk_api_summary(args) -> None:
         "startup: api_processing=enabled "
         f"({_api_prompt_source_summary(args)}, fallback_raw={fallback_raw})"
     )
+
+
+def _print_hold_to_talk_recording_summary(keep_audio: bool) -> None:
+    if keep_audio:
+        print("startup: recording_files=keep (保留每次听写的 wav 录音文件)")
+        return
+    print("startup: recording_files=discard_after_transcribe (默认转写后删除临时 wav)")
 
 
 def _print_hold_to_talk_quick_note_summary(args, config) -> None:
@@ -989,6 +1096,7 @@ def _run_dictate_loop(app: VoiceInputApp, request: SelectionRequest, args) -> in
     srt_out_dir = Path(args.srt_out_dir) if args.srt_out_dir else None
     device = _coerce_device(args.device)
     copy, paste = _voice_output_mode(args, app.config.hotkey.submit_strategy)
+    keep_audio = _should_keep_audio(args, app.config)
 
     print("Press Enter to record once. Type q then Enter to quit.")
     turn = 0
@@ -1041,9 +1149,11 @@ def _run_dictate_loop(app: VoiceInputApp, request: SelectionRequest, args) -> in
             TranscriptionError,
             ValueError,
         ) as exc:
+            _cleanup_audio_file(audio_path, keep_audio=keep_audio)
             print(f"error: {exc}", file=sys.stderr)
             return 2
 
+        _cleanup_audio_file(_source_path_from_result(output_result) or audio_path, keep_audio=keep_audio)
         print(output_result.text)
         _print_text_output_status(text_output)
         _print_quick_note_status(quick_note_result)
@@ -1057,11 +1167,13 @@ def _run_hold_to_talk(app: VoiceInputApp, request: SelectionRequest, args) -> in
     srt_out_dir = Path(args.srt_out_dir) if args.srt_out_dir else None
     device = _coerce_device(args.device)
     copy, paste = _voice_output_mode(args, app.config.hotkey.submit_strategy)
+    keep_audio = _should_keep_audio(args, app.config)
     state = {"session": None, "turn": 0}
 
     print(f"Hold {hold_key!r} to record. Release to transcribe. Press {quit_key!r} to quit.")
     _print_hold_to_talk_startup_summary(args, app.config.hotkey.submit_strategy)
     _print_hold_to_talk_api_summary(args)
+    _print_hold_to_talk_recording_summary(keep_audio)
     _print_hold_to_talk_quick_note_summary(args, app.config)
     _print_hold_to_talk_device_and_model_summary(app, request, args)
 
@@ -1090,6 +1202,7 @@ def _run_hold_to_talk(app: VoiceInputApp, request: SelectionRequest, args) -> in
         state["session"] = None
         text_path = text_out_dir / f"{stem}.txt" if text_out_dir else None
         srt_path = srt_out_dir / f"{stem}.srt" if srt_out_dir else None
+        audio_path = None
         try:
             started = perf_counter()
             audio_path = session.stop()
@@ -1123,9 +1236,12 @@ def _run_hold_to_talk(app: VoiceInputApp, request: SelectionRequest, args) -> in
             TranscriptionError,
             ValueError,
         ) as exc:
+            if audio_path is not None:
+                _cleanup_audio_file(audio_path, keep_audio=keep_audio)
             _print_hold_to_talk_status("failed")
             print(f"error: {exc}", file=sys.stderr)
             return
+        _cleanup_audio_file(_source_path_from_result(output_result) or audio_path, keep_audio=keep_audio)
         print(output_result.text)
         _print_text_output_status(text_output)
         _print_quick_note_status(quick_note_result)
@@ -1158,6 +1274,12 @@ def _maybe_write_srt(result, text_output, srt_path):
     return replace(text_output, srt_path=written)
 
 
+def _add_recording_retention_arguments(parser) -> None:
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--keep-audio", action="store_true", help="Keep the temporary wav recording after transcription.")
+    group.add_argument("--discard-audio", action="store_true", help="Delete the temporary wav recording after transcription.")
+
+
 def _add_api_processing_arguments(parser) -> None:
     parser.add_argument("--api-process", action="store_true", help="Process recognized text with the configured API provider before output.")
     parser.add_argument("--api-preset", choices=sorted(POSTPROCESS_PRESETS), default="clean")
@@ -1165,6 +1287,30 @@ def _add_api_processing_arguments(parser) -> None:
     parser.add_argument("--api-temperature", type=float, default=0.2)
     parser.add_argument("--api-max-tokens", type=int, default=512)
     parser.add_argument("--api-fallback-raw", action="store_true", help="If API processing fails, keep the raw ASR text instead of failing.")
+
+
+def _should_keep_audio(args, config) -> bool:
+    if getattr(args, "keep_audio", False):
+        return True
+    if getattr(args, "discard_audio", False):
+        return False
+    return bool(config.recording.keep_audio_files)
+
+
+def _source_path_from_result(result) -> Path | None:
+    raw = result.metadata.get("source_path") if hasattr(result, "metadata") else None
+    if not raw:
+        return None
+    return Path(raw)
+
+
+def _cleanup_audio_file(path: str | Path, *, keep_audio: bool) -> None:
+    if keep_audio:
+        return
+    try:
+        Path(path).unlink(missing_ok=True)
+    except OSError as exc:
+        print(f"warning: failed to remove temporary audio file {path}: {exc}", file=sys.stderr)
 
 
 def _maybe_process_text_with_api(text: str, config, args) -> ApiProcessingSummary:

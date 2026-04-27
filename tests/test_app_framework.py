@@ -222,6 +222,7 @@ class AppFrameworkTests(unittest.TestCase):
             language="zh",
             input_device=1,
             sample_rate_hz=48000,
+            keep_audio_files=True,
             hold_to_talk="f8",
             submit_strategy="clipboard_only",
             api_process_enabled=True,
@@ -238,6 +239,7 @@ class AppFrameworkTests(unittest.TestCase):
         self.assertEqual(config.selection.language, "zh")
         self.assertEqual(config.audio.input_device, 1)
         self.assertEqual(config.audio.sample_rate_hz, 48000)
+        self.assertTrue(config.recording.keep_audio_files)
         self.assertEqual(config.hotkey.hold_to_talk, "f8")
         self.assertEqual(config.hotkey.submit_strategy, "clipboard_only")
         self.assertTrue(config.api_processing.enabled)

@@ -12,6 +12,7 @@ from local_voice_input.asr import TranscriptionJob
 from local_voice_input.model_selector import ModelProfile
 from local_voice_input.sherpa_backend import (
     SENSEVOICE_DIR_NAME,
+    SENSEVOICE_INT8_DIR_NAME,
     SenseVoiceModelFiles,
     SherpaOnnxSenseVoiceBackend,
     default_model_root,
@@ -33,6 +34,20 @@ class SherpaBackendTests(unittest.TestCase):
             self.assertEqual(files.model, model)
             self.assertEqual(files.tokens, tokens)
             self.assertEqual(files.missing_paths(), ())
+
+    def test_discovers_official_int8_archive_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            model_dir = Path(temp_dir) / SENSEVOICE_INT8_DIR_NAME
+            model_dir.mkdir()
+            model = model_dir / "model.int8.onnx"
+            tokens = model_dir / "tokens.txt"
+            model.write_bytes(b"fake")
+            tokens.write_text("a 0\n", encoding="utf-8")
+
+            files = SenseVoiceModelFiles.discover(temp_dir)
+
+            self.assertEqual(files.model, model)
+            self.assertEqual(files.tokens, tokens)
 
     def test_backend_reports_missing_model_files(self):
         with tempfile.TemporaryDirectory() as temp_dir:

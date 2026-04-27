@@ -51,6 +51,8 @@ class CliTests(unittest.TestCase):
                         "1",
                         "--sample-rate",
                         "48000",
+                        "--keep-audio-files",
+                        "true",
                     ]
                 )
 
@@ -64,6 +66,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["selection"]["language"], "zh")
         self.assertEqual(data["audio"]["input_device"], 1)
         self.assertEqual(data["audio"]["sample_rate_hz"], 48000)
+        self.assertTrue(data["recording"]["keep_audio_files"])
 
     def test_config_path_uses_override(self):
         output = StringIO()
@@ -251,6 +254,87 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("status: failed", stdout.getvalue())
         self.assertIn("error: boom", stderr.getvalue())
+
+    def test_run_hold_to_talk_deletes_temporary_audio_by_default(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "captures"
+            seen = {}
+
+            class FakeSession:
+                def __init__(self, audio_path):
+                    self.audio_path = Path(audio_path)
+
+                def start(self):
+                    return None
+
+                def stop(self):
+                    self.audio_path.parent.mkdir(parents=True, exist_ok=True)
+                    self.audio_path.write_bytes(b"fake wav")
+                    return self.audio_path
+
+            class FakeApp:
+                def __init__(self):
+                    self.config = AppConfig()
+
+                def create_recording_session(self, audio_path, device=None):
+                    return FakeSession(audio_path)
+
+                def recommend_model(self, request=None):
+                    return SelectionResult(
+                        profile=ModelProfile(
+                            model_id="sensevoice-small-onnx-int8",
+                            display_name="SenseVoice Small ONNX INT8",
+                            backend="sherpa-onnx",
+                            min_ram_gb=3,
+                            recommended_ram_gb=4,
+                        ),
+                        reason="test",
+                    )
+
+                def transcribe_file(self, path, request=None):
+                    path = Path(path)
+                    seen["path"] = path
+                    seen["existed_during_transcribe"] = path.exists()
+                    return TranscriptionResult(
+                        text="hello from asr",
+                        model_id="fake-model",
+                        language=request.language,
+                        metadata={"source_path": str(path)},
+                    )
+
+            class FakeRunner:
+                def __init__(self, on_press, on_release, names):
+                    self.on_press = on_press
+                    self.on_release = on_release
+                    self.names = names
+
+                def run_until_quit(self):
+                    self.on_press()
+                    self.on_release()
+
+            args = SimpleNamespace(
+                hold_key=None,
+                quit_key=None,
+                output_dir=output_dir,
+                text_out_dir=None,
+                srt_out_dir=None,
+                device=None,
+                quick_note=False,
+                no_log=True,
+                copy=False,
+                clipboard_only=False,
+                no_paste=True,
+                keep_audio=False,
+                discard_audio=False,
+            )
+
+            with patch("local_voice_input.cli.PushToTalkHotkeyRunner", FakeRunner):
+                with contextlib.redirect_stdout(StringIO()):
+                    code = _run_hold_to_talk(FakeApp(), SelectionRequest(language="zh"), args)
+
+            self.assertEqual(code, 0)
+            self.assertTrue(seen["existed_during_transcribe"])
+            self.assertFalse(seen["path"].exists())
 
     def test_hold_to_talk_startup_summary_reports_effective_clipboard_paste_mode(self):
         args = SimpleNamespace(no_paste=False, clipboard_only=False, copy=False)
@@ -777,6 +861,27 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("unknown model", stderr.getvalue())
 
+    def test_download_model_dry_run_prints_install_plan(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = StringIO()
+            with contextlib.redirect_stdout(output):
+                code = main(
+                    [
+                        "download-model",
+                        "sensevoice-small-onnx-int8",
+                        "--model-root",
+                        temp_dir,
+                        "--dry-run",
+                        "--json",
+                    ]
+                )
+
+        self.assertEqual(code, 0)
+        data = json.loads(output.getvalue())
+        self.assertEqual(data["status"], "dry_run")
+        self.assertEqual(data["model_id"], "sensevoice-small-onnx-int8")
+        self.assertTrue(data["target_dir"].endswith("sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"))
+
     def test_hotword_commands_update_config(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "config.json"
@@ -882,6 +987,76 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(code, 2)
         self.assertIn("MISSING_API_KEY", stderr.getvalue())
+
+    def test_remote_asr_command_updates_config_without_sending_request(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "config.json"
+
+            with contextlib.redirect_stdout(StringIO()):
+                set_code = main(
+                    [
+                        "--config",
+                        str(path),
+                        "remote-asr",
+                        "set",
+                        "--enabled",
+                        "true",
+                        "--profile",
+                        "home_4090",
+                        "--base-url",
+                        "http://127.0.0.1:8765/",
+                        "--api-key-env",
+                        "OPENVOICE_REMOTE_ASR_KEY",
+                        "--timeout",
+                        "30",
+                        "--connect-timeout",
+                        "3",
+                        "--fallback-model-id",
+                        "sensevoice-small-onnx-int8",
+                        "--max-audio-mb",
+                        "128",
+                        "--verify-tls",
+                        "false",
+                    ]
+                )
+
+            output = StringIO()
+            with contextlib.redirect_stdout(output):
+                show_code = main(["--config", str(path), "remote-asr", "show"])
+
+        self.assertEqual(set_code, 0)
+        self.assertEqual(show_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["enabled"])
+        self.assertEqual(data["profile"], "home_4090")
+        profile = data["profiles"]["home_4090"]
+        self.assertEqual(profile["base_url"], "http://127.0.0.1:8765")
+        self.assertEqual(profile["api_key_env"], "OPENVOICE_REMOTE_ASR_KEY")
+        self.assertEqual(profile["timeout_s"], 30.0)
+        self.assertEqual(profile["connect_timeout_s"], 3.0)
+        self.assertEqual(profile["fallback_model_id"], "sensevoice-small-onnx-int8")
+        self.assertEqual(profile["max_audio_mb"], 128)
+        self.assertFalse(profile["verify_tls"])
+        self.assertNotIn("api_key", profile)
+
+    def test_remote_asr_command_rejects_unknown_fallback_model(self):
+        stderr = StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "config.json"
+            with contextlib.redirect_stderr(stderr):
+                code = main(
+                    [
+                        "--config",
+                        str(path),
+                        "remote-asr",
+                        "set",
+                        "--fallback-model-id",
+                        "missing-model",
+                    ]
+                )
+
+        self.assertEqual(code, 2)
+        self.assertIn("unknown fallback model", stderr.getvalue())
 
     def test_sendto_install_writes_drag_and_drop_launcher(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -39,6 +39,7 @@ class PushToTalkHotkeyRunner:
         self.names = names or HotkeyNames()
         self.keyboard = keyboard_module or _import_keyboard()
         self._recording = False
+        self._restoring_lock_key = False
 
     def run_until_quit(self) -> None:
         hold_key = normalize_hotkey_name(self.names.hold_to_talk)
@@ -55,16 +56,33 @@ class PushToTalkHotkeyRunner:
                 unhook_all()
 
     def _handle_press(self) -> None:
+        if self._restoring_lock_key:
+            return
         if self._recording:
             return
         self._recording = True
         self.on_press()
 
     def _handle_release(self) -> None:
+        if self._restoring_lock_key:
+            return
         if not self._recording:
             return
         self._recording = False
+        self._restore_hold_key_toggle_state()
         self.on_release()
+
+    def _restore_hold_key_toggle_state(self) -> None:
+        hold_key = normalize_hotkey_name(self.names.hold_to_talk)
+        if hold_key != "caps lock":
+            return
+        self._restoring_lock_key = True
+        try:
+            _press_and_release(self.keyboard, hold_key)
+        except Exception:
+            return
+        finally:
+            self._restoring_lock_key = False
 
 
 def _import_keyboard():
@@ -73,3 +91,13 @@ def _import_keyboard():
     except ImportError as exc:
         raise HotkeyError("missing Python package: keyboard") from exc
     return keyboard
+
+
+def _press_and_release(keyboard_module, key_name: str) -> None:
+    press_and_release = getattr(keyboard_module, "press_and_release", None)
+    if press_and_release is not None:
+        press_and_release(key_name)
+        return
+    send = getattr(keyboard_module, "send", None)
+    if send is not None:
+        send(key_name)

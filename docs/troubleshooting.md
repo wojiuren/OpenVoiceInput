@@ -21,6 +21,18 @@ models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt
 
 The model directory is ignored by Git, so a fresh clone will not include model weights.
 
+For the default model, try the one-command setup path first:
+
+```powershell
+py -m local_voice_input download-model sensevoice-small-onnx-int8
+```
+
+To see where it would install files without downloading anything:
+
+```powershell
+py -m local_voice_input download-model sensevoice-small-onnx-int8 --dry-run
+```
+
 ## Microphone Works Elsewhere But Not Here
 
 List input devices:
@@ -58,4 +70,3 @@ echo $env:SILICONFLOW_API_KEY
 ```
 
 The project config should contain the environment variable name, not the secret value itself.
-

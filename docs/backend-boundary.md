@@ -201,13 +201,13 @@ V1 当前不做：
 
 ## 下一步建议
 
-远程 ASR adapter 的最小配置骨架、`backend="remote-asr"` 的实验 `ModelProfile`、`RemoteAsrBackend` 空壳、请求 / 响应 JSON 纯函数、以及 fake transport 边界测试都已经落到代码里。当前这个后端能构造 request payload、解析成功响应、解析错误响应，也能通过测试假装调用服务端，但默认运行仍然不发真实 HTTP 请求。
+远程 ASR adapter 的最小配置骨架、`backend="remote-asr"` 的实验 `ModelProfile`、`RemoteAsrBackend` 空壳、请求 / 响应 JSON 纯函数、fake transport 边界测试，以及 `remote-asr show/set` CLI 配置入口都已经落到代码里。当前这个后端能构造 request payload、解析成功响应、解析错误响应，也能通过测试假装调用服务端；CLI 能查看和设置 `remote_asr` 配置，但默认运行仍然不发真实 HTTP 请求。
 
-下一步也不是直接写 4090 服务端，而是先把远程 ASR 配置入口补到 CLI：
+下一步仍然不是直接写 4090 服务端，而是先补真实 HTTP transport 的最小边界：
 
-- 能查看当前 `remote_asr` 是否启用、当前 profile、base URL、key 环境变量名。
-- 能设置启用开关、base URL、key 环境变量名、超时和 fallback 模型。
-- CLI 只读写配置，不主动测试远程服务。
+- 继续复用现有 `RemoteAsrBackend` 的 request / response 纯函数。
+- 第一版 transport 只负责把本机音频文件上传到配置好的 base URL。
+- 失败时走清楚的错误映射，先不自动吞错。
 - 继续不自动启动真实麦克风录音。
 
 这样以后真正接 4090 时，就不是临时拼一条命令，而是把它放进同一条 ASR 后端链路。

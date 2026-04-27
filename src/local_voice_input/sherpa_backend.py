@@ -12,6 +12,7 @@ from .model_selector import ModelProfile
 
 
 SENSEVOICE_DIR_NAME = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
+SENSEVOICE_INT8_DIR_NAME = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,7 @@ class SenseVoiceModelFiles:
         root = Path(model_root) if model_root else default_model_root()
         candidates = [
             root / SENSEVOICE_DIR_NAME,
+            root / SENSEVOICE_INT8_DIR_NAME,
             root / "sensevoice-small-onnx-int8",
             root,
         ]

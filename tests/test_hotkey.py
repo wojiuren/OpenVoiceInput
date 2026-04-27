@@ -10,6 +10,7 @@ class FakeKeyboard:
         self.press = None
         self.release = None
         self.waited_for = None
+        self.sent = []
         self.unhooked = False
 
     def on_press_key(self, name, callback):
@@ -24,6 +25,9 @@ class FakeKeyboard:
         self.press[1](None)
         self.release[1](None)
         self.release[1](None)
+
+    def press_and_release(self, name):
+        self.sent.append(name)
 
     def unhook_all(self):
         self.unhooked = True
@@ -48,5 +52,21 @@ class HotkeyTests(unittest.TestCase):
         self.assertEqual(events, ["press", "release"])
         self.assertEqual(keyboard.press[0], "caps lock")
         self.assertEqual(keyboard.release[0], "caps lock")
+        self.assertEqual(keyboard.sent, ["caps lock"])
         self.assertEqual(keyboard.waited_for, "esc")
         self.assertTrue(keyboard.unhooked)
+
+    def test_push_to_talk_runner_does_not_restore_non_toggle_key(self):
+        events = []
+        keyboard = FakeKeyboard()
+        runner = PushToTalkHotkeyRunner(
+            on_press=lambda: events.append("press"),
+            on_release=lambda: events.append("release"),
+            names=HotkeyNames(hold_to_talk="f8", quit="esc"),
+            keyboard_module=keyboard,
+        )
+
+        runner.run_until_quit()
+
+        self.assertEqual(events, ["press", "release"])
+        self.assertEqual(keyboard.sent, [])

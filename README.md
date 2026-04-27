@@ -109,6 +109,12 @@ At minimum, the local backend needs:
 
 Model weights are not committed to this repository.
 
+Install the default model with:
+
+```powershell
+py -m local_voice_input download-model sensevoice-small-onnx-int8
+```
+
 ## Documentation
 
 Current public-facing documents:

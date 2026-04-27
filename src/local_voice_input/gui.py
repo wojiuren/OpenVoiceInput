@@ -68,6 +68,7 @@ class GuiState:
     notes_dir: str
     language: str
     input_device: int | str | None
+    keep_audio_files: bool
     hold_to_talk: str
     submit_strategy: str
     recommended_model_id: str
@@ -141,6 +142,7 @@ def build_gui_state(
         notes_dir=str(notes_root),
         language=app.config.selection.language,
         input_device=app.config.audio.input_device,
+        keep_audio_files=app.config.recording.keep_audio_files,
         hold_to_talk=app.config.hotkey.hold_to_talk,
         submit_strategy=app.config.hotkey.submit_strategy,
         recommended_model_id=recommendation.profile.model_id,
@@ -157,6 +159,7 @@ def build_gui_state(
         settings_summary=_settings_summary(
             language=app.config.selection.language,
             input_device=app.config.audio.input_device,
+            keep_audio_files=app.config.recording.keep_audio_files,
             hold_to_talk=app.config.hotkey.hold_to_talk,
             submit_strategy=app.config.hotkey.submit_strategy,
             api_process_enabled=app.config.api_processing.enabled,
@@ -203,6 +206,7 @@ def apply_gui_settings(
     input_device_text: str,
     hold_to_talk: str,
     submit_strategy: str,
+    keep_audio_files: bool | None = None,
     api_process_enabled: bool | None = None,
     api_preset: str | None = None,
     api_fallback_raw: bool | None = None,
@@ -212,6 +216,7 @@ def apply_gui_settings(
         config,
         language=language.strip() or config.selection.language,
         input_device=_parse_input_device_text(input_device_text),
+        keep_audio_files=keep_audio_files,
         hold_to_talk=hold_to_talk.strip() or config.hotkey.hold_to_talk,
         submit_strategy=_parse_submit_strategy_text(submit_strategy) or config.hotkey.submit_strategy,
         api_process_enabled=api_process_enabled,
@@ -322,6 +327,7 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
     hotkey_help_var = tk.StringVar(value=state.hotkey_help)
     hotkey_mode_var = tk.StringVar(value=state.hotkey_mode_summary)
     submit_help_var = tk.StringVar(value=state.submit_help)
+    keep_audio_var = tk.BooleanVar(value=state.keep_audio_files)
     api_process_var = tk.BooleanVar(value=state.api_process_enabled)
     api_preset_var = tk.StringVar(value=_display_api_preset(state.api_preset))
     api_fallback_var = tk.BooleanVar(value=state.api_fallback_raw)
@@ -380,13 +386,19 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
     )
 
     ttk.Label(root, text="提交方式").grid(row=12, column=0, sticky="w", padx=10, pady=4)
+    submit_frame = ttk.Frame(root)
+    submit_frame.grid(row=12, column=1, sticky="ew", padx=10, pady=4)
+    submit_frame.columnconfigure(0, weight=1)
     ttk.Combobox(
-        root,
+        submit_frame,
         textvariable=submit_var,
         values=_submit_strategy_choices(),
-        width=28,
+        width=24,
         state="readonly",
-    ).grid(row=12, column=1, sticky="ew", padx=10, pady=4)
+    ).grid(row=0, column=0, sticky="ew")
+    ttk.Checkbutton(submit_frame, text="保留录音", variable=keep_audio_var).grid(
+        row=0, column=1, sticky="w", padx=(8, 0)
+    )
     ttk.Label(root, textvariable=submit_help_var, wraplength=320, justify="left").grid(
         row=13, column=1, sticky="w", padx=10, pady=(0, 4)
     )
@@ -484,6 +496,7 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
         hotkey_mode_var.set(state.hotkey_mode_summary)
         _sync_device_widgets(device_var, device_box, state.input_device, state.devices)
         submit_var.set(_display_submit_strategy(state.submit_strategy))
+        keep_audio_var.set(state.keep_audio_files)
         submit_help_var.set(state.submit_help)
         api_process_var.set(state.api_process_enabled)
         api_preset_var.set(_display_api_preset(state.api_preset))
@@ -542,6 +555,7 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
                 input_device_text=device_var.get(),
                 hold_to_talk=hotkey_var.get(),
                 submit_strategy=submit_var.get(),
+                keep_audio_files=keep_audio_var.get(),
                 api_process_enabled=api_process_var.get(),
                 api_preset=api_preset_var.get(),
                 api_fallback_raw=api_fallback_var.get(),
@@ -563,6 +577,7 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
                 input_device_text=device_var.get(),
                 hold_to_talk=hotkey_var.get(),
                 submit_strategy=submit_var.get(),
+                keep_audio_files=keep_audio_var.get(),
                 api_process_enabled=api_process_var.get(),
                 api_preset=api_preset_var.get(),
                 api_fallback_raw=api_fallback_var.get(),
@@ -599,6 +614,7 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
                 input_device_text=device_var.get(),
                 hold_to_talk=hotkey_var.get(),
                 submit_strategy=submit_var.get(),
+                keep_audio_files=keep_audio_var.get(),
                 api_process_enabled=api_process_var.get(),
                 api_preset=api_preset_var.get(),
                 api_fallback_raw=api_fallback_var.get(),
@@ -898,6 +914,8 @@ def _hold_to_talk_command(config_file: str | Path, config: AppConfig | None = No
             command.append("--api-fallback-raw")
     if config is not None and config.quick_capture.enabled:
         command.append("--quick-note")
+    if config is not None and config.recording.keep_audio_files:
+        command.append("--keep-audio")
     return command
 
 
@@ -1081,6 +1099,7 @@ def _settings_summary(
     *,
     language: str,
     input_device: int | str | None,
+    keep_audio_files: bool,
     hold_to_talk: str,
     submit_strategy: str,
     api_process_enabled: bool,
@@ -1097,6 +1116,8 @@ def _settings_summary(
         f"API 整理：{_api_processing_summary(api_process_enabled, api_preset, api_fallback_raw)}\n"
         f"快速记录：{quick_note_text}"
     )
+    recording_text = "保留" if keep_audio_files else "不保留"
+    summary = f"{summary}\n录音文件：{recording_text}"
     if input_device is not None and not _is_known_input_device(input_device, devices):
         if devices:
             return (
