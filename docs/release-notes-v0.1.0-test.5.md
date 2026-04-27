@@ -1,14 +1,26 @@
-# OpenVoiceInput-MVP v0.1.0-test.5 Draft Release Notes
+# OpenVoiceInput-MVP v0.1.0-test.5 Release Notes
 
-This is a draft note for the next portable Windows test build. The release is still an MVP test package, not a stable public release.
+This is an early portable Windows test build. It is meant for hands-on testing, not as a stable public release.
+
+## Assets
+
+- `OpenVoiceInput-MVP-v0.1.0-test.5-portable.zip`
+- `OpenVoiceInput-MVP-v0.1.0-test.5-portable.zip.sha256`
+- SHA256: `4C0E0F229B8490903F3092C1C068E8A2A6A3B5AC978BEE80299863068DB6DEDC`
 
 ## Main User-Facing Changes
 
-- The packaged test build should use `Start-OpenVoiceInput.cmd` as the main entry point.
+- The packaged test build uses `Start-OpenVoiceInput.cmd` as the main entry point.
 - `Open-GUI.cmd` remains as a compatibility alias.
 - `Hold-To-Talk.cmd` is kept for direct hotkey troubleshooting.
 - The GUI is the intended daily entry point.
 - The command line remains useful for diagnostics, environment checks, and repeatable tests.
+- The package includes the default SenseVoice INT8 model files needed for local smoke testing.
+- If model files are missing after a manual checkout or cleanup, run:
+
+  ```powershell
+  py -m local_voice_input download-model sensevoice-small-onnx-int8
+  ```
 
 ## Dictation And Hotkey Behavior
 
@@ -28,8 +40,8 @@ This is a draft note for the next portable Windows test build. The release is st
 ## GUI And Packaging
 
 - The GUI has controls for common dictation settings, API post-processing status, quick-note status, and audio retention.
-- The portable package should include the SenseVoice INT8 files needed for the basic local smoke test when available on the build machine.
-- The package should not include user recordings, API keys, local worklogs, downloaded large language models, or generated benchmark results.
+- The portable package includes the SenseVoice INT8 files needed for the basic local smoke test.
+- The package does not include user recordings, API keys, local worklogs, downloaded large language models, or generated benchmark results.
 
 ## Known Limitations
 
@@ -37,14 +49,13 @@ This is a draft note for the next portable Windows test build. The release is st
 - Some target apps may block simulated paste. Clipboard-only output is the fallback path.
 - The GUI still needs manual verification on real user apps before a public release.
 - Remote ASR and larger local text post-processing models are experimental and not part of the default path.
-- A clean-history public repository is recommended before changing GitHub visibility to public.
+- The GitHub Release is expected to be marked as a prerelease.
 
 ## Suggested Verification Before Publishing
 
 ```powershell
 py -m unittest discover -s tests
 py -m local_voice_input doctor --run-transcribe-smoke
-py experiments\text-postprocess-models\run_eval.py --list
 .\scripts\build-test-package.ps1 -Version v0.1.0-test.5
 ```
 
