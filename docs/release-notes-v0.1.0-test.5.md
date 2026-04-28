@@ -14,6 +14,8 @@ This is an early portable Windows test build. It is meant for hands-on testing, 
 - `Open-GUI.cmd` remains as a compatibility alias.
 - `Hold-To-Talk.cmd` is kept for direct hotkey troubleshooting.
 - The GUI is the intended daily entry point.
+- The GUI now includes a `下载默认模型` action for installing the default SenseVoice model from inside the panel.
+- Closing the GUI window minimizes the panel; use `退出面板` when you really want to exit.
 - The command line remains useful for diagnostics, environment checks, and repeatable tests.
 - The package includes the default SenseVoice INT8 model files needed for local smoke testing.
 - If model files are missing after a manual checkout or cleanup, run:
@@ -40,6 +42,7 @@ This is an early portable Windows test build. It is meant for hands-on testing, 
 ## GUI And Packaging
 
 - The GUI has controls for common dictation settings, API post-processing status, quick-note status, and audio retention.
+- API post-processing remains disabled by default; enable it explicitly when testing external cleanup or polishing.
 - The portable package includes the SenseVoice INT8 files needed for the basic local smoke test.
 - The package does not include user recordings, API keys, local worklogs, downloaded large language models, or generated benchmark results.
 
@@ -60,4 +63,3 @@ py -m local_voice_input doctor --run-transcribe-smoke
 ```
 
 The smoke test must not start a real microphone recording. Real microphone testing should be done manually by the user.
-

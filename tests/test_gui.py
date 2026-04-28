@@ -41,6 +41,7 @@ from local_voice_input.gui import (
     _display_submit_strategy,
     _display_hotkey,
     _doctor_help,
+    _download_model_command,
     _hotkey_help,
     _hotkey_mode_summary,
     _hold_to_talk_command,
@@ -49,6 +50,10 @@ from local_voice_input.gui import (
     _is_known_input_device,
     _language_help,
     _model_help,
+    _model_setup_help,
+    _model_setup_summary,
+    _model_download_detail,
+    _model_download_log_path,
     _parse_api_preset_text,
     _parse_submit_strategy_text,
     _quick_note_help,
@@ -180,6 +185,8 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(state.doctor_ok)
         self.assertEqual(state.devices[0]["index"], 1)
         self.assertIn("当前按听写优先", state.model_help)
+        self.assertEqual(state.model_setup_summary, "默认模型：缺失或不可用")
+        self.assertIn("下载默认模型", state.model_setup_help)
         self.assertIn("基础依赖、模型文件和音频设备检查已经通过", state.doctor_help)
         self.assertIn("语言：zh", state.settings_summary)
         self.assertIn("热键：Caps Lock", state.settings_summary)
@@ -876,6 +883,42 @@ class GuiTests(unittest.TestCase):
 
     def test_hold_to_talk_log_path_uses_captures_directory(self):
         self.assertEqual(_hold_to_talk_log_path(Path("captures")), Path("captures") / "hold-to-talk.log")
+
+    def test_download_model_command_uses_console_python(self):
+        with mock.patch("local_voice_input.gui._console_python_executable", return_value="C:\\Python312\\python.exe"):
+            command = _download_model_command()
+
+        self.assertEqual(
+            command,
+            [
+                "C:\\Python312\\python.exe",
+                "-m",
+                "local_voice_input",
+                "download-model",
+                "sensevoice-small-onnx-int8",
+            ],
+        )
+
+    def test_model_download_log_path_uses_captures_directory(self):
+        self.assertEqual(_model_download_log_path(Path("captures")), Path("captures") / "model-download.log")
+
+    def test_model_setup_helpers_report_installed_and_missing_states(self):
+        installed = DiagnosticCheck(name="model:sensevoice", ok=True, message="C:\\model.int8.onnx")
+        missing = DiagnosticCheck(name="model:sensevoice", ok=False, message="missing model files")
+
+        self.assertEqual(_model_setup_summary(installed), "默认模型：已安装")
+        self.assertIn("重装", _model_setup_help(installed))
+        self.assertEqual(_model_setup_summary(missing), "默认模型：缺失或不可用")
+        self.assertIn("download-model", _model_setup_help(missing))
+
+    def test_model_download_detail_includes_log_tail(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "model-download.log"
+            path.write_text("first\ninstalled", encoding="utf-8")
+            detail = _model_download_detail(0, path)
+
+        self.assertIn("退出码 0", detail)
+        self.assertIn("installed", detail)
 
     def test_windows_hidden_creationflags_returns_int(self):
         creationflags = _windows_hidden_creationflags()

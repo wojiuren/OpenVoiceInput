@@ -23,6 +23,7 @@ from .config import (
 )
 from .diagnostics import DiagnosticCheck, run_diagnostics
 from .hotkey import normalize_hotkey_name
+from .model_download import DEFAULT_SENSEVOICE_MODEL_ID, sensevoice_install_plan, sensevoice_setup_command
 from .windows_entry import (
     GuiAutostartOptions,
     remove_gui_autostart_launcher,
@@ -75,6 +76,8 @@ class GuiState:
     recommended_backend: str
     recommendation_reason: str
     model_help: str
+    model_setup_summary: str
+    model_setup_help: str
     doctor_ok: bool
     doctor_summary: str
     doctor_help: str
@@ -129,6 +132,7 @@ def build_gui_state(
     failed = [check.name for check in checks if not check.ok]
     doctor_ok = not failed
     doctor_summary = _doctor_summary(checks)
+    model_check = _model_check(checks)
     device_items = tuple(_device_to_dict(device) for device in resolved_devices)
     startup_script = Path(autostart_path) if autostart_path is not None else _default_autostart_path()
     startup_enabled = startup_script.exists() if autostart_enabled is None else autostart_enabled
@@ -153,6 +157,8 @@ def build_gui_state(
             recommendation.profile.backend,
             recommendation.reason,
         ),
+        model_setup_summary=_model_setup_summary(model_check),
+        model_setup_help=_model_setup_help(model_check),
         doctor_ok=doctor_ok,
         doctor_summary=doctor_summary,
         doctor_help=_doctor_help(checks),
@@ -317,6 +323,8 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
     submit_var = tk.StringVar(value=_display_submit_strategy(state.submit_strategy))
     model_var = tk.StringVar(value=state.recommended_model_id)
     model_help_var = tk.StringVar(value=state.model_help)
+    model_setup_var = tk.StringVar(value=state.model_setup_summary)
+    model_setup_help_var = tk.StringVar(value=state.model_setup_help)
     doctor_var = tk.StringVar(value=state.doctor_summary)
     doctor_help_var = tk.StringVar(value=state.doctor_help)
     summary_var = tk.StringVar(value=state.settings_summary)
@@ -344,50 +352,61 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
     quick_rule_keep_keyword_var = tk.BooleanVar(value=False)
     status_var = tk.StringVar(value=_status_ready())
     hold_process = {"process": None}
+    model_download_process = {"process": None}
 
     ttk.Label(root, text="推荐模型").grid(row=0, column=0, sticky="w", padx=10, pady=(10, 4))
-    ttk.Label(root, textvariable=model_var).grid(row=0, column=1, sticky="w", padx=10, pady=(10, 4))
+    model_header_frame = ttk.Frame(root)
+    model_header_frame.grid(row=0, column=1, sticky="ew", padx=10, pady=(10, 4))
+    model_header_frame.columnconfigure(0, weight=1)
+    ttk.Label(model_header_frame, textvariable=model_var).grid(row=0, column=0, sticky="w")
+    ttk.Label(model_header_frame, textvariable=model_setup_var).grid(row=1, column=0, sticky="w", pady=(3, 0))
+    ttk.Button(model_header_frame, text="下载默认模型", command=lambda: download_default_model()).grid(
+        row=0, column=1, rowspan=2, sticky="e", padx=(8, 0)
+    )
     ttk.Label(root, textvariable=model_help_var, wraplength=320, justify="left").grid(
         row=1, column=1, sticky="w", padx=10, pady=(0, 4)
     )
+    ttk.Label(root, textvariable=model_setup_help_var, wraplength=320, justify="left").grid(
+        row=2, column=1, sticky="w", padx=10, pady=(0, 4)
+    )
 
-    ttk.Label(root, text="环境体检").grid(row=2, column=0, sticky="w", padx=10, pady=4)
-    ttk.Label(root, textvariable=doctor_var).grid(row=2, column=1, sticky="w", padx=10, pady=4)
+    ttk.Label(root, text="环境体检").grid(row=3, column=0, sticky="w", padx=10, pady=4)
+    ttk.Label(root, textvariable=doctor_var).grid(row=3, column=1, sticky="w", padx=10, pady=4)
     ttk.Label(root, textvariable=doctor_help_var, wraplength=320, justify="left").grid(
-        row=3, column=1, sticky="w", padx=10, pady=(0, 4)
+        row=4, column=1, sticky="w", padx=10, pady=(0, 4)
     )
 
-    ttk.Label(root, text="当前设置").grid(row=4, column=0, sticky="nw", padx=10, pady=4)
+    ttk.Label(root, text="当前设置").grid(row=5, column=0, sticky="nw", padx=10, pady=4)
     ttk.Label(root, textvariable=summary_var, wraplength=320, justify="left").grid(
-        row=4, column=1, sticky="w", padx=10, pady=4
+        row=5, column=1, sticky="w", padx=10, pady=4
     )
 
-    ttk.Label(root, text="语言").grid(row=5, column=0, sticky="w", padx=10, pady=4)
-    ttk.Entry(root, textvariable=language_var, width=24).grid(row=5, column=1, sticky="ew", padx=10, pady=4)
+    ttk.Label(root, text="语言").grid(row=6, column=0, sticky="w", padx=10, pady=4)
+    ttk.Entry(root, textvariable=language_var, width=24).grid(row=6, column=1, sticky="ew", padx=10, pady=4)
     ttk.Label(root, textvariable=language_help_var, wraplength=320, justify="left").grid(
-        row=6, column=1, sticky="w", padx=10, pady=(0, 4)
+        row=7, column=1, sticky="w", padx=10, pady=(0, 4)
     )
 
-    ttk.Label(root, text="输入设备").grid(row=7, column=0, sticky="w", padx=10, pady=4)
+    ttk.Label(root, text="输入设备").grid(row=8, column=0, sticky="w", padx=10, pady=4)
     device_box = ttk.Combobox(root, textvariable=device_var, values=(), width=40)
-    device_box.grid(row=7, column=1, sticky="ew", padx=10, pady=4)
+    device_box.grid(row=8, column=1, sticky="ew", padx=10, pady=4)
     _sync_device_widgets(device_var, device_box, state.input_device, state.devices)
     ttk.Label(root, textvariable=device_help_var, wraplength=320, justify="left").grid(
-        row=8, column=1, sticky="w", padx=10, pady=(0, 4)
+        row=9, column=1, sticky="w", padx=10, pady=(0, 4)
     )
 
-    ttk.Label(root, text="热键").grid(row=9, column=0, sticky="w", padx=10, pady=4)
-    ttk.Entry(root, textvariable=hotkey_var, width=24).grid(row=9, column=1, sticky="ew", padx=10, pady=4)
+    ttk.Label(root, text="热键").grid(row=10, column=0, sticky="w", padx=10, pady=4)
+    ttk.Entry(root, textvariable=hotkey_var, width=24).grid(row=10, column=1, sticky="ew", padx=10, pady=4)
     ttk.Label(root, textvariable=hotkey_mode_var, wraplength=320, justify="left").grid(
-        row=10, column=1, sticky="w", padx=10, pady=(0, 4)
-    )
-    ttk.Label(root, textvariable=hotkey_help_var, wraplength=320, justify="left").grid(
         row=11, column=1, sticky="w", padx=10, pady=(0, 4)
     )
+    ttk.Label(root, textvariable=hotkey_help_var, wraplength=320, justify="left").grid(
+        row=12, column=1, sticky="w", padx=10, pady=(0, 4)
+    )
 
-    ttk.Label(root, text="提交方式").grid(row=12, column=0, sticky="w", padx=10, pady=4)
+    ttk.Label(root, text="提交方式").grid(row=13, column=0, sticky="w", padx=10, pady=4)
     submit_frame = ttk.Frame(root)
-    submit_frame.grid(row=12, column=1, sticky="ew", padx=10, pady=4)
+    submit_frame.grid(row=13, column=1, sticky="ew", padx=10, pady=4)
     submit_frame.columnconfigure(0, weight=1)
     ttk.Combobox(
         submit_frame,
@@ -400,12 +419,12 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
         row=0, column=1, sticky="w", padx=(8, 0)
     )
     ttk.Label(root, textvariable=submit_help_var, wraplength=320, justify="left").grid(
-        row=13, column=1, sticky="w", padx=10, pady=(0, 4)
+        row=14, column=1, sticky="w", padx=10, pady=(0, 4)
     )
 
-    ttk.Label(root, text="API 整理").grid(row=14, column=0, sticky="w", padx=10, pady=4)
+    ttk.Label(root, text="API 整理").grid(row=15, column=0, sticky="w", padx=10, pady=4)
     api_frame = ttk.Frame(root)
-    api_frame.grid(row=14, column=1, sticky="ew", padx=10, pady=4)
+    api_frame.grid(row=15, column=1, sticky="ew", padx=10, pady=4)
     api_frame.columnconfigure(1, weight=1)
     ttk.Checkbutton(api_frame, text="启用", variable=api_process_var).grid(row=0, column=0, sticky="w")
     ttk.Combobox(
@@ -417,21 +436,21 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
     ).grid(row=0, column=1, sticky="ew", padx=6)
     ttk.Checkbutton(api_frame, text="失败退回原文", variable=api_fallback_var).grid(row=0, column=2, sticky="w")
     ttk.Label(root, textvariable=api_help_var, wraplength=320, justify="left").grid(
-        row=15, column=1, sticky="w", padx=10, pady=(0, 4)
-    )
-    ttk.Label(root, textvariable=api_provider_var, wraplength=320, justify="left").grid(
         row=16, column=1, sticky="w", padx=10, pady=(0, 4)
     )
-    ttk.Label(root, textvariable=api_context_var, wraplength=320, justify="left").grid(
+    ttk.Label(root, textvariable=api_provider_var, wraplength=320, justify="left").grid(
         row=17, column=1, sticky="w", padx=10, pady=(0, 4)
     )
-    ttk.Label(root, textvariable=api_context_help_var, wraplength=320, justify="left").grid(
+    ttk.Label(root, textvariable=api_context_var, wraplength=320, justify="left").grid(
         row=18, column=1, sticky="w", padx=10, pady=(0, 4)
     )
+    ttk.Label(root, textvariable=api_context_help_var, wraplength=320, justify="left").grid(
+        row=19, column=1, sticky="w", padx=10, pady=(0, 4)
+    )
 
-    ttk.Label(root, text="快速记录").grid(row=19, column=0, sticky="w", padx=10, pady=4)
+    ttk.Label(root, text="快速记录").grid(row=20, column=0, sticky="w", padx=10, pady=4)
     quick_note_frame = ttk.Frame(root)
-    quick_note_frame.grid(row=19, column=1, sticky="ew", padx=10, pady=4)
+    quick_note_frame.grid(row=20, column=1, sticky="ew", padx=10, pady=4)
     quick_note_frame.columnconfigure(1, weight=1)
     ttk.Checkbutton(quick_note_frame, text="启用", variable=quick_note_enabled_var).grid(row=0, column=0, sticky="w")
     ttk.Label(quick_note_frame, textvariable=quick_note_var, wraplength=260, justify="left").grid(
@@ -466,17 +485,17 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
         row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0)
     )
     ttk.Label(root, textvariable=quick_note_help_var, wraplength=320, justify="left").grid(
-        row=20, column=1, sticky="w", padx=10, pady=(0, 4)
+        row=21, column=1, sticky="w", padx=10, pady=(0, 4)
     )
 
-    ttk.Label(root, text="开机自启").grid(row=21, column=0, sticky="w", padx=10, pady=4)
-    ttk.Label(root, textvariable=autostart_var).grid(row=21, column=1, sticky="w", padx=10, pady=4)
+    ttk.Label(root, text="开机自启").grid(row=22, column=0, sticky="w", padx=10, pady=4)
+    ttk.Label(root, textvariable=autostart_var).grid(row=22, column=1, sticky="w", padx=10, pady=4)
     ttk.Label(root, textvariable=autostart_help_var, wraplength=320, justify="left").grid(
-        row=22, column=1, sticky="w", padx=10, pady=(0, 4)
+        row=23, column=1, sticky="w", padx=10, pady=(0, 4)
     )
 
     button_frame = ttk.Frame(root)
-    button_frame.grid(row=23, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 4))
+    button_frame.grid(row=24, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 4))
     for index in range(2):
         button_frame.columnconfigure(index, weight=1)
 
@@ -485,6 +504,8 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
         state = new_state
         model_var.set(state.recommended_model_id)
         model_help_var.set(state.model_help)
+        model_setup_var.set(state.model_setup_summary)
+        model_setup_help_var.set(state.model_setup_help)
         doctor_var.set(state.doctor_summary)
         doctor_help_var.set(state.doctor_help)
         summary_var.set(state.settings_summary)
@@ -719,6 +740,46 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
         hotkey_var.set(recommended)
         status_var.set(_status_action_success("已填入推荐热键", _recommended_hotkey_reason(recommended)))
 
+    def download_default_model() -> None:
+        log_path = _model_download_log_path(state.captures_dir)
+        if _process_is_running(model_download_process["process"]):
+            status_var.set(
+                _status_action_success(
+                    "默认模型正在下载",
+                    f"PID {model_download_process['process'].pid}；日志写入 {log_path}",
+                )
+            )
+            return
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("ab") as log_file:
+                process = subprocess.Popen(
+                    _download_model_command(),
+                    cwd=str(Path.cwd()),
+                    stdout=log_file,
+                    stderr=log_file,
+                    creationflags=_windows_hidden_creationflags(),
+                )
+            returncode = _wait_for_quick_exit(process)
+            if returncode is not None:
+                detail = _model_download_detail(returncode, log_path)
+                apply_state(build_gui_state(app, config_path=config_file))
+                if returncode == 0:
+                    status_var.set(_status_action_success("默认模型安装完成", detail))
+                else:
+                    status_var.set(_status_action_success("默认模型安装命令已退出", detail))
+                return
+            model_download_process["process"] = process
+        except Exception as exc:
+            status_var.set(_status_action_error("下载默认模型", exc))
+            return
+        status_var.set(
+            _status_action_success(
+                "默认模型正在后台下载",
+                f"PID {process.pid}；下载完成后点“重新检查状态”；日志写入 {log_path}",
+            )
+        )
+
     def open_config_dir() -> None:
         try:
             config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -758,7 +819,7 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
     )
 
     action_frame = ttk.Frame(root)
-    action_frame.grid(row=24, column=0, columnspan=2, sticky="ew", padx=10, pady=4)
+    action_frame.grid(row=25, column=0, columnspan=2, sticky="ew", padx=10, pady=4)
     for index in range(3):
         action_frame.columnconfigure(index, weight=1)
 
@@ -779,12 +840,12 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
     )
 
     ttk.Label(root, textvariable=status_var, wraplength=420, justify="left").grid(
-        row=25, column=0, columnspan=2, sticky="w", padx=10, pady=(4, 2)
+        row=26, column=0, columnspan=2, sticky="w", padx=10, pady=(4, 2)
     )
     ttk.Label(root, text="提示：点右上角关闭会缩到任务栏，不会退出。", wraplength=420, justify="left").grid(
-        row=26, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10)
+        row=27, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10)
     )
-    root.protocol("WM_DELETE_WINDOW", quit_panel)
+    root.protocol("WM_DELETE_WINDOW", lambda: _minimize_window(root))
     try:
         root.mainloop()
     finally:
@@ -965,6 +1026,28 @@ def _windows_hidden_creationflags() -> int:
     return int(getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
+def _download_model_command() -> list[str]:
+    return [
+        _console_python_executable(),
+        "-m",
+        "local_voice_input",
+        "download-model",
+        DEFAULT_SENSEVOICE_MODEL_ID,
+    ]
+
+
+def _model_download_log_path(captures_dir: str | Path) -> Path:
+    return Path(captures_dir) / "model-download.log"
+
+
+def _model_download_detail(returncode: int, log_path: Path) -> str:
+    tail = _read_text_tail(log_path)
+    detail = f"退出码 {returncode}；日志写入 {log_path}"
+    if tail:
+        return f"{detail}；最后日志：{tail}"
+    return detail
+
+
 def _minimize_window(window) -> None:
     window.iconify()
 
@@ -1037,6 +1120,27 @@ def _doctor_summary(checks: Sequence[DiagnosticCheck]) -> str:
     if smoke:
         return "已通过体检和转录冒烟测试"
     return "已通过基础体检"
+
+
+def _model_check(checks: Sequence[DiagnosticCheck]) -> DiagnosticCheck | None:
+    return next((check for check in checks if check.name == "model:sensevoice"), None)
+
+
+def _model_setup_summary(check: DiagnosticCheck | None) -> str:
+    if check and check.ok:
+        return "默认模型：已安装"
+    return "默认模型：缺失或不可用"
+
+
+def _model_setup_help(check: DiagnosticCheck | None) -> str:
+    plan = sensevoice_install_plan()
+    command = sensevoice_setup_command()
+    if check and check.ok:
+        return f"已找到默认 SenseVoice 模型。需要重装或换目录时，可点“下载默认模型”，等同于运行：{command}"
+    return (
+        "如果环境体检提示缺模型，可以点“下载默认模型”。"
+        f"模型会安装到 {plan.target_dir}；也可以在命令行运行：{command}"
+    )
 
 
 def _doctor_help(checks: Sequence[DiagnosticCheck]) -> str:
