@@ -6,7 +6,7 @@ This is an early portable Windows test build. It is meant for hands-on testing, 
 
 - `OpenVoiceInput-MVP-v0.1.0-test.5-portable.zip`
 - `OpenVoiceInput-MVP-v0.1.0-test.5-portable.zip.sha256`
-- SHA256: `4C0E0F229B8490903F3092C1C068E8A2A6A3B5AC978BEE80299863068DB6DEDC`
+- The exact SHA256 is published beside the final uploaded zip as the `.sha256` asset.
 
 ## Main User-Facing Changes
 
