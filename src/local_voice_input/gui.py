@@ -302,6 +302,7 @@ def launch_gui(app, *, config_path: str | Path | None = None) -> None:
 
     gui_lock = _try_acquire_gui_single_instance_lock()
     if gui_lock is None:
+        print("OpenVoiceInput GUI is already running. Check the taskbar, or use the existing window's exit button first.")
         return
     gui_lock_ref = {"handle": gui_lock}
 

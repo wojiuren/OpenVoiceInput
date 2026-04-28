@@ -77,18 +77,20 @@ setlocal
 cd /d "%~dp0"
 set "PYTHONPATH=%~dp0src"
 title OpenVoiceInput
-where pyw >nul 2>nul
-if not errorlevel 1 (
-  start "" pyw -m local_voice_input gui
-  endlocal
-  exit /b 0
-)
+echo [OpenVoiceInput] Opening the GUI test build...
+echo [OpenVoiceInput] Keep this window open while testing. It will show startup errors instead of hiding them.
+echo.
 py -m local_voice_input gui
 if errorlevel 1 (
   echo.
   echo [OpenVoiceInput] Failed to open GUI. Run Install-Dependencies.cmd or Run-Doctor.cmd first.
   pause
+  endlocal
+  exit /b 1
 )
+echo.
+echo [OpenVoiceInput] GUI closed. If it said another GUI is already running, check the taskbar or exit the old panel first.
+pause
 endlocal
 '@
 
@@ -158,7 +160,8 @@ $readmeLines = @(
     "On the current development machine, dependencies may already be installed, so Run-Doctor.cmd may work first.",
     "",
     "Main entry:",
-    "- Start-OpenVoiceInput.cmd opens the GUI. Use this first.",
+    "- Start-OpenVoiceInput.cmd opens the GUI in a visible test console. Use this first.",
+    "- Keep the console open while testing; it shows startup errors instead of hiding them.",
     "- Open-GUI.cmd is kept as a compatibility alias for older test notes.",
     "- Hold-To-Talk.cmd starts the hotkey mode directly for troubleshooting.",
     "",
